@@ -1,0 +1,32 @@
+name: freedom_fitness
+description: "Freedom Fitness - Rolling Queue Workout System"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.4
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  flutter_riverpod: ^2.5.0
+  go_router: any
+  hive: any
+  hive_flutter: any
+  google_fonts: any
+  fl_chart: any
+  url_launcher: any
+  intl: any
+  uuid: any
+  shared_preferences: any
+  youtube_player_iframe: ^5.2.2
+  webview_flutter_web: any
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
