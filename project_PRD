@@ -1,0 +1,82 @@
+# Product Requirement Document: "The Athletic Manager" v1.0
+
+Technical Spec for transforming the 60-minute "Tennis Athlete" workout into an automated, bio-feedback-driven application.
+
+---
+
+## Core Architecture: The 60-Minute Hard-Cap Engine
+
+The primary differentiator for this app is the "Dynamic Pruning" logic. The app must treat the 60-minute mark as an immutable hard stop to respect your professional schedule.
+
+---
+
+## P0: MVP & Core Utility (The Foundation)
+
+**Goal:** Ensure the 3-day split is executable with zero friction.
+
+**Logic:** Implement a Rolling Queue for Day 1, Day 2, and Day 3.
+
+**The 60-Minute Timer:** A persistent countdown clock at the top of the UI.
+
+**The "Block" Logic:**
+- **Primer (8m):** Automated countdown for 4m Walk, 3m Run, 1m Stretch.
+- **Block A/B/C:** Grouped exercises. Block B must use Giant Set timing (Rest only after B3).
+- **Hard-Stop Notification:** At 50 minutes, the app triggers a "Final 10" alert. It automatically skips the "Alternative" exercises in Block C and jumps to Hanging Crunches and Dead Hangs.
+- **Manual Override:** Buttons for "Gym Crowded" or "Low Energy" that instantly swap the current exercise for the Easier Alternative provided in our table.
+
+---
+
+## P1: Bio-Feedback & Intelligence (The Coach)
+
+**Goal:** Monitor recovery and suggest the "Smart Swap" to Aspirational goals.
+
+**Strength & Volume Tracker:** Log reps/weight for every set.
+
+**The "Aspirational" Unlock Engine:**
+- **Logic:** If Lat_Pulldown_RPE <= 6 AND Dead_Hang_Time >= 60s, trigger notification: "Shoulder stability peak detected. Unlocking: Skin-the-Cat progression."
+
+**Grip-Strength as a Proxy:** Track Dead Hang duration. If duration drops >20% vs. the 7-day average, the app automatically suggests the Easier Alternatives for the next session, citing "Central Nervous System Fatigue."
+
+**Tennis Match Integration:** Connect to Google Calendar/Health Data. If a tennis match is detected <24 hours ago, the app forces a "Recovery Protocol" version of the workout (all exercises swapped to Alternatives).
+
+---
+
+## P2: Computer Vision & Form Analysis (The VLM)
+
+**Goal:** Local-only video analysis for technical moves.
+
+**Hanging Crunch Angle:** Use the camera to measure the Pelvic Tilt.
+- **Logic:** If the pelvis doesn't curl upward (only legs move), the app provides a haptic buzz and the cue: "Focus on curling your tailbone toward your chin."
+
+**The "Swing" Detector:** During Hanging Crunches or KB Swings, detect momentum. If the user is "swinging," suggest the Easier Alternative (e.g., Captain's Chair) to ensure muscle isolation.
+
+**Aspirational Check:** Side-by-side video analysis for Pistol Squats and L-Sits to compare your current form against the "Tennis Pro" reference model.
+
+---
+
+## P3: Agentic Workflows & Posture Intervention
+
+**Goal:** Proactive health management for the 12-hour desk-bound engineer.
+
+**The "Spine Reset" Nudge:** If the phone/watch detects 4 hours of sedentary behavior, the agent sends a notification: "Spine compression detected. Perform 1x 60s Dead Hang to reset your posture."
+
+**AI Visualization (Imagen 3):** Based on your progress in Blocks A and B, generate a visual "Future-Self" rendering of you successfully completing an L-Sit or Skin-the-Cat to drive motivation for the Month 2 goals.
+
+**The "Smart Scheduler":** If the user misses a workout, the agent doesn't just "push it to tomorrow." It analyzes the calendar for the next 48 hours and identifies the optimal 60-minute window based on low-intensity meeting blocks.
+
+---
+
+## Summary Table
+
+| Feature | Input Data | Expected Output |
+|---------|-----------|----------------|
+| P0 Timer | System Clock | Auto-skipping exercises at T-minus 10 mins |
+| P1 Analytics | User Reps/Weights | Swapping "Lunges" for "Pistol Squats" at specific benchmarks |
+| P2 Vision | Camera Feed | Haptic feedback on "Hanging Crunch" form accuracy |
+| P3 Lifestyle | Health/Calendar API | "Dead Hang" reminders during long coding sessions |
+
+---
+
+## Final Instruction
+
+The user is a 35-year-old Engineering Manager. The priority is Efficiency and Spinal Decompression. Maintain the 60-minute hard cap at all costs. Prioritize 'Relative Strength' (moving one's own bodyweight) to build a Tennis Athlete physique rather than a Bodybuilder bulk.

@@ -22,11 +22,39 @@ dependencies:
   shared_preferences: any
   youtube_player_iframe: ^5.2.2
   webview_flutter_web: any
+  # P0.1 — OAuth & AI
+  google_sign_in: any
+  google_sign_in_platform_interface: any
+  google_sign_in_web: any
+  flutter_secure_storage: any
+  google_generative_ai: 0.4.0
+  # P0.2 — Vision Machine ID
+  camera: any
+  image_picker: any
+  # P0.3 — Voice Control
+  speech_to_text: any
+  flutter_tts: any
+  http: ^1.6.0
+  # P1 — Health Connect / HealthKit
+  health: ^13.3.1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.3
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  web:
+    generate: true
+    image_path: "assets/app_icon.png"
+  image_path: "assets/app_icon.png"
+  adaptive_icon_background: "#FFFFFF"
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/freedom_fitness_logo.png
+    - assets/data/exercises.json

@@ -24,7 +24,7 @@ android {
         applicationId = "com.freedomfitness.freedom_fitness"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        minSdk = 26
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -43,10 +43,17 @@ flutter {
     source = "../.."
 }
 
+dependencies {
+    implementation("androidx.health.connect:connect-client:1.1.0-alpha07")
+}
+
 configurations.all {
     resolutionStrategy {
         force("androidx.browser:browser:1.8.0")
         force("androidx.core:core:1.15.0")
         force("androidx.core:core-ktx:1.15.0")
+        force("androidx.activity:activity:1.9.3")
+        force("androidx.activity:activity-ktx:1.9.3")
+        force("androidx.navigationevent:navigationevent-android:1.0.0")
     }
 }
