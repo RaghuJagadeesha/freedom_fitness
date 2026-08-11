@@ -398,6 +398,19 @@ class ActiveWorkoutNotifier extends StateNotifier<WorkoutSession?> {
     _persistDraft();
   }
 
+  /// Add [elapsedSeconds] of time the user spent on [exerciseIndex] (from when
+  /// the exercise was opened until it was completed / left).
+  void addExerciseElapsed(int exerciseIndex, int elapsedSeconds) {
+    if (state == null || elapsedSeconds <= 0) return;
+    final exercises = List<ExerciseLog>.from(state!.exercises);
+    final theExercise = exercises[exerciseIndex];
+    exercises[exerciseIndex] = theExercise.copyWith(
+      elapsedSeconds: theExercise.elapsedSeconds + elapsedSeconds,
+    );
+    state = state!.copyWith(exercises: exercises);
+    _persistDraft();
+  }
+
   void rateExercise(int exerciseIndex, Difficulty difficulty) {
     if (state == null) return;
     final exercises = List<ExerciseLog>.from(state!.exercises);

@@ -352,6 +352,7 @@ class ExerciseLog {
   final Difficulty? difficulty;
   final String notes;
   final int restSeconds; // rest taken between finishing this exercise and starting the next
+  final int elapsedSeconds; // true time spent on the exercise (from opening to completion)
 
   const ExerciseLog({
     required this.exerciseId,
@@ -360,6 +361,7 @@ class ExerciseLog {
     this.difficulty,
     this.notes = '',
     this.restSeconds = 0,
+    this.elapsedSeconds = 0,
   });
 
   double get maxWeight =>
@@ -377,6 +379,7 @@ class ExerciseLog {
     Difficulty? difficulty,
     String? notes,
     int? restSeconds,
+    int? elapsedSeconds,
   }) {
     return ExerciseLog(
       exerciseId: exerciseId,
@@ -385,6 +388,7 @@ class ExerciseLog {
       difficulty: difficulty ?? this.difficulty,
       notes: notes ?? this.notes,
       restSeconds: restSeconds ?? this.restSeconds,
+      elapsedSeconds: elapsedSeconds ?? this.elapsedSeconds,
     );
   }
 
@@ -395,6 +399,7 @@ class ExerciseLog {
     'difficulty': difficulty?.index,
     'notes': notes,
     'restSeconds': restSeconds,
+    'elapsedSeconds': elapsedSeconds,
   };
 
   factory ExerciseLog.fromJson(Map<String, dynamic> json) => ExerciseLog(
@@ -408,6 +413,7 @@ class ExerciseLog {
         : null,
     notes: json['notes'] ?? '',
     restSeconds: json['restSeconds'] ?? 0,
+    elapsedSeconds: json['elapsedSeconds'] ?? 0,
   );
 }
 

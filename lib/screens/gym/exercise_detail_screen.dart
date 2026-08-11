@@ -24,6 +24,7 @@ class _ExerciseDetailState extends ConsumerState<ExerciseDetailScreen> {
   int _restSec = 0;
   bool _resting = false;
   DateTime? _restStart;
+  late DateTime _openedAt;
   YoutubePlayerController? _ytController;
 
   bool _isVoiceListening = false;
@@ -33,6 +34,7 @@ class _ExerciseDetailState extends ConsumerState<ExerciseDetailScreen> {
   @override
   void initState() {
     super.initState();
+    _openedAt = DateTime.now();
     final session = ref.read(activeWorkoutProvider);
     if (session == null) return;
     final slots = SeedData.getMainSlots(session.splitType, session.dayIndex);
@@ -59,8 +61,14 @@ class _ExerciseDetailState extends ConsumerState<ExerciseDetailScreen> {
   @override
   void dispose() {
     _restTimer?.cancel();
+    final logIndex = widget.exerciseIndex + SeedData.primerCount;
     if (_resting && _restStart != null) {
-      _recordCurrentRest(widget.exerciseIndex + SeedData.primerCount);
+      _recordCurrentRest(logIndex);
+    }
+    // Persist how long the exercise was open (true total time).
+    final elapsed = DateTime.now().difference(_openedAt).inSeconds;
+    if (elapsed > 0) {
+      ref.read(activeWorkoutProvider.notifier).addExerciseElapsed(logIndex, elapsed);
     }
     _weightCtrl.dispose();
     _repsCtrl.dispose();

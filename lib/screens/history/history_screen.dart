@@ -80,17 +80,35 @@ class HistoryScreen extends ConsumerWidget {
             )),
 
             if (sessions.isEmpty && floaters.isEmpty)
-              SliverToBoxAdapter(child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Container(padding: const EdgeInsets.all(32), decoration: BoxDecoration(color: AppColors.cardBg, borderRadius: BorderRadius.circular(20)),
-                  child: Column(children: [
-                    const Text('🏋️', style: TextStyle(fontSize: 40)),
-                    const SizedBox(height: 12),
-                    Text('No workouts yet', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                    const SizedBox(height: 4),
-                    Text('Complete your first workout to see it here.', style: TextStyle(color: AppColors.textSecondary, fontSize: 14)),
-                  ])),
-              )),
+              SliverFillRemaining(
+                hasScrollBody: false,
+                fillOverscroll: true,
+                child: Container(
+                  width: double.infinity,
+                  height: double.infinity,
+                  margin: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.all(24),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: AppColors.cardBg,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: AppColors.surfaceLight),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text('🏋️', style: TextStyle(fontSize: 40)),
+                      const SizedBox(height: 12),
+                      Text('No workouts yet',
+                          style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                      const SizedBox(height: 4),
+                      Text('Complete your first workout to see it here.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: AppColors.textSecondary, fontSize: 14)),
+                    ],
+                  ),
+                ),
+              ),
 
             // Merged timeline
             SliverList(delegate: SliverChildBuilderDelegate((ctx, i) {
@@ -295,8 +313,12 @@ class _SessionTileState extends State<_SessionTile> {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
               Expanded(child: Text(ex.exerciseName, style: TextStyle(color: AppColors.textPrimary, fontSize: 13, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis, maxLines: 1)),
-              if (ex.totalRestSeconds > 0)
+              if (ex.elapsedSeconds > 0)
+                Text(_fmtRest(ex.elapsedSeconds), style: TextStyle(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.w600)),
+              if (ex.totalRestSeconds > 0) ...[
+                const SizedBox(width: 6),
                 Text('rest ${_fmtRest(ex.totalRestSeconds)}', style: TextStyle(color: AppColors.textMuted, fontSize: 11)),
+              ],
             ]),
             const SizedBox(height: 6),
             ...ex.sets.map((s) => Padding(

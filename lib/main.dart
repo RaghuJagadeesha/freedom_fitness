@@ -29,7 +29,7 @@ void main() async {
 }
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
-final _shellNavigatorKey = GlobalKey<NavigatorState>();
+final _shellNavigatorKey = shellNavigatorKey;
 
 final _router = GoRouter(
   navigatorKey: _rootNavigatorKey,

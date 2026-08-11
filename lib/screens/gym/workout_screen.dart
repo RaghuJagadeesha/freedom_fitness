@@ -190,14 +190,6 @@ class _WorkoutScreenState extends ConsumerState<WorkoutScreen>
                     swapMap: swapMap,
                   ),
 
-                  // ─── Between-Exercises Rest Timer (elapsed seconds) ───
-                  if (_resting)
-                    _RestBanner(
-                      elapsed: _restElapsed,
-                      onSkip: () => _stopRest(record: true),
-                    ),
-                  const SizedBox(height: 8),
-
                   // Show skipped exercises if hard-stopped
                   if (timerState.skipAlternatives) ...[
                     const SizedBox(height: 8),
@@ -365,33 +357,35 @@ class _WorkoutScreenState extends ConsumerState<WorkoutScreen>
       final completed = log != null && log.sets.length >= slot.exercise.sets;
       final hasLogs = log != null && log.sets.isNotEmpty;
 
+      // Between-exercises rest: show on the just-completed exercise row
+      final isRestingAfterThis = _resting && _restAfterSessionIndex == sessionIndex;
+      final betweenExRestSec = isRestingAfterThis ? _restElapsed : (log?.restSeconds ?? 0);
+
+      // Between-sets rest: show on in-progress exercise row (last set's rest)
+      final lastSetRestSec = hasLogs && !completed && log.sets.isNotEmpty
+          ? log.sets.last.restSeconds
+          : 0;
       // ── Main (or swapped-out) exercise tile ──
       results.add(AnimatedContainer(
         duration: const Duration(milliseconds: 300),
         margin: const EdgeInsets.only(bottom: 4),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: isSwappedOut || completed
-              ? AppColors.cardBg.withValues(alpha: 0.4)
-              : AppColors.cardBg,
+          color: completed
+              ? AppColors.primary.withValues(alpha: 0.12)
+              : (isSwappedOut
+                  ? AppColors.cardBg.withValues(alpha: 0.4)
+                  : AppColors.cardBg),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.surfaceLight),
+          border: Border.all(
+            color: completed
+                ? AppColors.primary.withValues(alpha: 0.5)
+                : AppColors.surfaceLight,
+            width: completed ? 1.5 : 1,
+          ),
         ),
         child: Row(
           children: [
-            Container(
-              width: 36, height: 36,
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Center(
-                child: completed
-                    ? const Icon(Icons.check, color: AppColors.primary, size: 18)
-                    : Text('${showSlots.indexOf(slot) + 1}',
-                        style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700, fontSize: 14)),
-              ),
-            ),
             const SizedBox(width: 12),
             _ExerciseThumb(gifUrl: slot.exercise.gifUrl),
             const SizedBox(width: 12),
@@ -409,22 +403,61 @@ class _WorkoutScreenState extends ConsumerState<WorkoutScreen>
                   if (hasLogs) Text(
                     '${log.sets.length}/${slot.exercise.sets} sets',
                     style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+                  // Set rest (live on in-progress exercise)
+                  if (lastSetRestSec > 0)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Row(
+                        children: [
+                          Icon(Icons.timer_outlined, size: 12, color: AppColors.secondary),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Set rest: ${_fmtRest(lastSetRestSec)}',
+                            style: TextStyle(color: AppColors.secondary, fontSize: 11, fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                    ),
+                  // Total time for completed exercise (from when it was opened)
+                  if (completed && hasLogs)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Row(
+                        children: [
+                          Icon(Icons.access_time, size: 12, color: AppColors.primary),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Total: ${_fmtRest(log.elapsedSeconds)}',
+                            style: TextStyle(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                    ),
                 ],
               ),
             ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: (isSwappedOut ? AppColors.textMuted : AppColors.primary).withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(6),
+            // Between-exercises rest (live on completed exercise, before chevron)
+            if (betweenExRestSec > 0 && !isSwappedOut) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppColors.secondary.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.timer, size: 11, color: AppColors.secondary),
+                    const SizedBox(width: 4),
+                    Text(
+                      _fmtRest(betweenExRestSec),
+                      style: TextStyle(color: AppColors.secondary, fontSize: 11, fontWeight: FontWeight.w700),
+                    ),
+                  ],
+                ),
               ),
-              child: Text(
-                isSwappedOut ? 'SWAPPED' : (completed ? 'DONE' : ''),
-                style: TextStyle(
-                  color: isSwappedOut ? AppColors.textMuted : AppColors.primary,
-                  fontSize: 9, fontWeight: FontWeight.w700),
-              ),
-            ),
+            ],
             if (isSwappedOut) ...[
               const SizedBox(width: 6),
               GestureDetector(
@@ -506,8 +539,8 @@ class _WorkoutScreenState extends ConsumerState<WorkoutScreen>
               ),
               child: Row(
                 children: [
-                  Icon(Icons.swap_horiz, color: AppColors.textMuted, size: 16),
-                  const SizedBox(width: 8),
+                  _ExerciseThumb(gifUrl: altEx.gifUrl),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1042,6 +1075,14 @@ class _WorkoutScreenState extends ConsumerState<WorkoutScreen>
       ),
     );
   }
+
+  String _fmtRest(int seconds) {
+    if (seconds <= 0) return '0s';
+    final m = seconds ~/ 60;
+    final s = seconds % 60;
+    if (m == 0) return '${s}s';
+    return s == 0 ? '${m}m' : '${m}m ${s}s';
+  }
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -1432,65 +1473,6 @@ class _ExerciseThumb extends StatelessWidget {
       color: AppColors.surfaceLight,
       child: const Icon(Icons.fitness_center,
           color: AppColors.textMuted, size: 20),
-    );
-  }
-}
-
-// ──────────────────────────────────────────────────────────────
-//  Between-Exercises Rest Timer Banner (elapsed seconds)
-// ──────────────────────────────────────────────────────────────
-
-class _RestBanner extends StatelessWidget {
-  final int elapsed;
-  final VoidCallback onSkip;
-
-  const _RestBanner({required this.elapsed, required this.onSkip});
-
-  String get _timeLabel {
-    final m = elapsed ~/ 60;
-    final s = elapsed % 60;
-    return '$m:${s.toString().padLeft(2, '0')}';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.timer, color: AppColors.primary, size: 20),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Rest between exercises',
-                  style: TextStyle(color: AppColors.primary, fontSize: 13, fontWeight: FontWeight.w600),
-                ),
-                Text(
-                  _timeLabel,
-                  style: GoogleFonts.outfit(
-                    color: AppColors.primary,
-                    fontSize: 24,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          TextButton(
-            onPressed: onSkip,
-            child: const Text('Skip', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
-          ),
-        ],
-      ),
     );
   }
 }

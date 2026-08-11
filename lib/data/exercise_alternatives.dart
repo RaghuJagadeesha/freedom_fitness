@@ -1,6 +1,8 @@
 import '../models/models.dart';
 
 class ExerciseAlternatives {
+  static const _gifBase = 'https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/';
+
   static final Map<String, Exercise> tennisEasierSwaps = {
     'alt_machine_chest_press': const Exercise(
       id: 'alt_machine_chest_press',
@@ -11,6 +13,7 @@ class ExerciseAlternatives {
       reps: 15,
       description: 'Guided press path. Lower CNS demand than free weights.',
       equipmentType: 'chest_press_machine',
+      gifUrl: '${_gifBase}videos/0577-T0yTjgW.gif',
     ),
     'alt_machine_shoulder_press': const Exercise(
       id: 'alt_machine_shoulder_press',
@@ -21,6 +24,7 @@ class ExerciseAlternatives {
       reps: 15,
       description: 'Guided overhead press to protect rotator cuffs.',
       equipmentType: 'shoulder_press_machine',
+      gifUrl: '${_gifBase}videos/0603-67n3r98.gif',
     ),
     'alt_band_pull_apart': const Exercise(
       id: 'alt_band_pull_apart',
@@ -31,6 +35,7 @@ class ExerciseAlternatives {
       reps: 15,
       description: 'Light band. Rear delt and rotator cuff focus. Low fatigue.',
       equipmentType: 'band',
+      gifUrl: '${_gifBase}videos/0993-sTfvVsG.gif',
     ),
     'alt_leg_press': const Exercise(
       id: 'alt_leg_press',
@@ -41,6 +46,7 @@ class ExerciseAlternatives {
       reps: 15,
       description: 'Machine-supported. Reduced core demand. Good for low energy.',
       equipmentType: 'leg_press_machine',
+      gifUrl: '${_gifBase}videos/0760-7zdxRTl.gif',
     ),
     'alt_leg_curl': const Exercise(
       id: 'alt_leg_curl',
@@ -51,6 +57,7 @@ class ExerciseAlternatives {
       reps: 15,
       description: 'Isolates hamstrings. No lower back strain.',
       equipmentType: 'leg_curl_machine',
+      gifUrl: '${_gifBase}videos/0599-Zg3XY7P.gif',
     ),
     'alt_captains_chair': const Exercise(
       id: 'alt_captains_chair',
@@ -61,6 +68,7 @@ class ExerciseAlternatives {
       reps: 12,
       description: 'Use padded station. Reduced grip demand vs hanging.',
       equipmentType: 'captains_chair',
+      gifUrl: '${_gifBase}videos/2963-weoDEpH.gif',
     ),
     'alt_bodyweight_glute': const Exercise(
       id: 'alt_bodyweight_glute',
@@ -70,6 +78,7 @@ class ExerciseAlternatives {
       sets: 3,
       reps: 20,
       description: 'No weight. Focus on squeeze at top.',
+      gifUrl: '${_gifBase}videos/3561-GibBPPg.gif',
     ),
     'alt_lat_pulldown': const Exercise(
       id: 'alt_lat_pulldown',
@@ -80,6 +89,7 @@ class ExerciseAlternatives {
       reps: 12,
       description: 'Machine-assisted alternative to pull-ups. Controlled weight.',
       equipmentType: 'lat_pulldown_machine',
+      gifUrl: '${_gifBase}videos/0673-ecpY0rH.gif',
     ),
     'alt_bench_dips': const Exercise(
       id: 'alt_bench_dips',
@@ -89,6 +99,7 @@ class ExerciseAlternatives {
       sets: 3,
       reps: 12,
       description: 'Use a bench. Feet on ground. Easier on shoulders.',
+      gifUrl: '${_gifBase}videos/0129-RrLske5.gif',
     ),
     'alt_walking_lunges': const Exercise(
       id: 'alt_walking_lunges',
@@ -98,6 +109,7 @@ class ExerciseAlternatives {
       sets: 3,
       reps: 10,
       description: 'No weight. Focus on form and depth.',
+      gifUrl: '${_gifBase}videos/1460-IZVHb27.gif',
     ),
     'alt_plank_hold': const Exercise(
       id: 'alt_plank_hold',
@@ -107,6 +119,7 @@ class ExerciseAlternatives {
       sets: 3,
       durationSeconds: 30,
       description: 'Hold plank. Keep core braced. Low impact.',
+      gifUrl: '${_gifBase}videos/2135-VBAWRPG.gif',
     ),
   };
 }

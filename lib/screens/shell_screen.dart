@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../theme/app_theme.dart';
 
+/// Key for the shell navigator, so tab switching can dismiss any open
+/// modal sheets (e.g. the "Switch Workout?" sheet) before navigating.
+final shellNavigatorKey = GlobalKey<NavigatorState>();
+
 class ShellScreen extends StatelessWidget {
   final Widget child;
   const ShellScreen({super.key, required this.child});
@@ -53,6 +57,12 @@ class ShellScreen extends StatelessWidget {
   }
 
   void _onTap(BuildContext context, int index) {
+    // Dismiss any open modal sheet (e.g. "Switch Workout?") on the shell
+    // navigator first, so the tab switch isn't blocked by the sheet.
+    final shellNav = shellNavigatorKey.currentState;
+    if (shellNav != null && shellNav.canPop()) {
+      shellNav.pop();
+    }
     switch (index) {
       case 0:
         context.go('/home');
