@@ -353,6 +353,8 @@ class ExerciseLog {
   final String notes;
   final int restSeconds; // rest taken between finishing this exercise and starting the next
   final int elapsedSeconds; // true time spent on the exercise (from opening to completion)
+  final DateTime? startedAt;
+  final DateTime? completedAt;
 
   const ExerciseLog({
     required this.exerciseId,
@@ -362,6 +364,8 @@ class ExerciseLog {
     this.notes = '',
     this.restSeconds = 0,
     this.elapsedSeconds = 0,
+    this.startedAt,
+    this.completedAt,
   });
 
   double get maxWeight =>
@@ -374,12 +378,26 @@ class ExerciseLog {
   int get totalRestSeconds =>
       restSeconds + sets.fold(0, (sum, s) => sum + s.restSeconds);
 
+  /// Computes the true total duration in seconds.
+  /// Uses completedAt - startedAt if completed, or DateTime.now() - startedAt if in progress.
+  /// Falls back to elapsedSeconds.
+  int get activeElapsedSeconds {
+    if (startedAt != null) {
+      final end = completedAt ?? DateTime.now();
+      final diff = end.difference(startedAt!).inSeconds;
+      return diff > elapsedSeconds ? diff : elapsedSeconds;
+    }
+    return elapsedSeconds;
+  }
+
   ExerciseLog copyWith({
     List<SetLog>? sets,
     Difficulty? difficulty,
     String? notes,
     int? restSeconds,
     int? elapsedSeconds,
+    DateTime? startedAt,
+    DateTime? completedAt,
   }) {
     return ExerciseLog(
       exerciseId: exerciseId,
@@ -389,6 +407,8 @@ class ExerciseLog {
       notes: notes ?? this.notes,
       restSeconds: restSeconds ?? this.restSeconds,
       elapsedSeconds: elapsedSeconds ?? this.elapsedSeconds,
+      startedAt: startedAt ?? this.startedAt,
+      completedAt: completedAt ?? this.completedAt,
     );
   }
 
@@ -400,6 +420,8 @@ class ExerciseLog {
     'notes': notes,
     'restSeconds': restSeconds,
     'elapsedSeconds': elapsedSeconds,
+    'startedAt': startedAt?.toIso8601String(),
+    'completedAt': completedAt?.toIso8601String(),
   };
 
   factory ExerciseLog.fromJson(Map<String, dynamic> json) => ExerciseLog(
@@ -414,6 +436,8 @@ class ExerciseLog {
     notes: json['notes'] ?? '',
     restSeconds: json['restSeconds'] ?? 0,
     elapsedSeconds: json['elapsedSeconds'] ?? 0,
+    startedAt: json['startedAt'] != null ? DateTime.tryParse(json['startedAt']) : null,
+    completedAt: json['completedAt'] != null ? DateTime.tryParse(json['completedAt']) : null,
   );
 }
 
@@ -566,6 +590,13 @@ class WorkoutSession {
     this.durationMinutes = 0,
     this.completed = false,
   });
+
+  ExerciseLog? getLogFor(String exerciseId) {
+    for (final e in exercises) {
+      if (e.exerciseId == exerciseId) return e;
+    }
+    return null;
+  }
 
   WorkoutSession copyWith({
     List<ExerciseLog>? exercises,

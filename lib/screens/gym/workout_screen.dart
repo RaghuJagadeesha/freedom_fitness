@@ -25,7 +25,7 @@ class _WorkoutScreenState extends ConsumerState<WorkoutScreen>
   Timer? _restTimer;
   int _restElapsed = 0;
   bool _resting = false;
-  int? _restAfterSessionIndex;
+  String? _restAfterExerciseId;
 
   @override
   void initState() {
@@ -68,9 +68,9 @@ class _WorkoutScreenState extends ConsumerState<WorkoutScreen>
     ref.listen<WorkoutSession?>(activeWorkoutProvider, (prev, next) {
       if (prev == null || next == null) return;
       if (_resting || _restTimer != null) return;
-      final completedNow = _findJustCompleted(prev, next);
-      if (completedNow != null) {
-        _restAfterSessionIndex = completedNow;
+      final completedExId = _findJustCompleted(prev, next);
+      if (completedExId != null) {
+        _restAfterExerciseId = completedExId;
         _startRest();
       }
     });
@@ -79,10 +79,10 @@ class _WorkoutScreenState extends ConsumerState<WorkoutScreen>
     ref.listen<WorkoutSession?>(activeWorkoutProvider, (prev, next) {
       if (prev == null || next == null) return;
       if (!_resting) return;
-      for (var i = 0; i < next.exercises.length; i++) {
-        final justStarted = next.exercises[i].sets.isNotEmpty &&
-            (prev.exercises.length <= i || prev.exercises[i].sets.isEmpty);
-        if (justStarted && i != _restAfterSessionIndex) {
+      for (final nextLog in next.exercises) {
+        final prevLog = prev.getLogFor(nextLog.exerciseId);
+        final justStarted = nextLog.sets.isNotEmpty && (prevLog == null || prevLog.sets.isEmpty);
+        if (justStarted && nextLog.exerciseId != _restAfterExerciseId) {
           _stopRest(record: true);
           break;
         }
@@ -321,9 +321,6 @@ class _WorkoutScreenState extends ConsumerState<WorkoutScreen>
     );
   }
 
-  int get _primerCount => SeedData.primerCount;
-  int _sessionIndexOf(int slotIndex) => slotIndex + _primerCount;
-
   List<Widget> _buildPrimerTiles(WorkoutSession session) {
     const primers = SeedData.primerExercises;
     return [
@@ -348,17 +345,14 @@ class _WorkoutScreenState extends ConsumerState<WorkoutScreen>
 
     for (final slot in showSlots) {
       final globalIndex = allSlots.indexOf(slot);
-      final sessionIndex = _sessionIndexOf(globalIndex);
       final isSwappedOut = swapMap.containsKey(globalIndex);
       final swappedInEx = swapMap[globalIndex];
-      final log = sessionIndex < session.exercises.length
-          ? session.exercises[sessionIndex]
-          : null;
+      final log = session.getLogFor(slot.exercise.id);
       final completed = log != null && log.sets.length >= slot.exercise.sets;
       final hasLogs = log != null && log.sets.isNotEmpty;
 
       // Between-exercises rest: show on the just-completed exercise row
-      final isRestingAfterThis = _resting && _restAfterSessionIndex == sessionIndex;
+      final isRestingAfterThis = _resting && _restAfterExerciseId == slot.exercise.id;
       final betweenExRestSec = isRestingAfterThis ? _restElapsed : (log?.restSeconds ?? 0);
 
       // Between-sets rest: show on in-progress exercise row (last set's rest)
@@ -418,8 +412,8 @@ class _WorkoutScreenState extends ConsumerState<WorkoutScreen>
                         ],
                       ),
                     ),
-                  // Total time for completed exercise (from when it was opened)
-                  if (completed && hasLogs)
+                  // Total time for exercise (includes set work and set rest)
+                  if (log != null && log.activeElapsedSeconds > 0)
                     Padding(
                       padding: const EdgeInsets.only(top: 4),
                       child: Row(
@@ -427,7 +421,7 @@ class _WorkoutScreenState extends ConsumerState<WorkoutScreen>
                           Icon(Icons.access_time, size: 12, color: AppColors.primary),
                           const SizedBox(width: 4),
                           Text(
-                            'Total: ${_fmtRest(log.elapsedSeconds)}',
+                            completed ? 'Total: ${_fmtRest(log.activeElapsedSeconds)}' : 'Time: ${_fmtRest(log.activeElapsedSeconds)}',
                             style: TextStyle(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.w600),
                           ),
                         ],
@@ -490,18 +484,25 @@ class _WorkoutScreenState extends ConsumerState<WorkoutScreen>
       ));
 
       if (isSwappedOut && swappedInEx != null) {
+        final swappedLog = session.getLogFor(swappedInEx.id);
+        final swappedCompleted = swappedLog != null && swappedLog.sets.length >= swappedInEx.sets;
+
         // ── Swapped-in alt exercise (ACTIVE, tappable) ──
         results.add(GestureDetector(
-          onTap: globalIndex < session.exercises.length
-              ? () => context.push('/exercise/$globalIndex')
-              : null,
+          onTap: () => _openExercise(globalIndex),
           child: Container(
             margin: const EdgeInsets.only(bottom: 8, left: 24),
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.08),
+              color: swappedCompleted
+                  ? AppColors.primary.withValues(alpha: 0.12)
+                  : AppColors.primary.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+              border: Border.all(
+                color: swappedCompleted
+                    ? AppColors.primary.withValues(alpha: 0.5)
+                    : AppColors.primary.withValues(alpha: 0.3),
+              ),
             ),
             child: Row(
               children: [
@@ -513,8 +514,16 @@ class _WorkoutScreenState extends ConsumerState<WorkoutScreen>
                     children: [
                       Text(swappedInEx.name,
                         style: GoogleFonts.inter(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
-                      Text('${swappedInEx.sets} × ${swappedInEx.reps} reps',
+                      Text('${swappedLog?.sets.length ?? 0}/${swappedInEx.sets} sets',
                         style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+                      if (swappedLog != null && swappedLog.activeElapsedSeconds > 0)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            swappedCompleted ? 'Total: ${_fmtRest(swappedLog.activeElapsedSeconds)}' : 'Time: ${_fmtRest(swappedLog.activeElapsedSeconds)}',
+                            style: TextStyle(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.w600),
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -570,29 +579,41 @@ class _WorkoutScreenState extends ConsumerState<WorkoutScreen>
     if (_resting) {
       _stopRest(record: true);
     }
+    final session = ref.read(activeWorkoutProvider);
+    if (session != null) {
+      final slots = SeedData.getMainSlots(session.splitType, session.dayIndex);
+      final swapMap = ref.read(activeSwapProvider);
+      final swappedEx = swapMap[globalIndex];
+      final ex = swappedEx ?? slots[globalIndex].exercise;
+      ref.read(activeWorkoutProvider.notifier).startExercise(ex.id, ex.name);
+    }
     context.push('/exercise/$globalIndex');
   }
 
   /// Whether the exercise at [globalIndex] has all its sets logged.
   bool _isCompleted(int globalIndex, int targetSets, WorkoutSession session) {
-    final sessionIndex = _sessionIndexOf(globalIndex);
-    final log = sessionIndex < session.exercises.length
-        ? session.exercises[sessionIndex]
-        : null;
+    final slots = SeedData.getMainSlots(session.splitType, session.dayIndex);
+    final swapMap = ref.read(activeSwapProvider);
+    final swappedEx = swapMap[globalIndex];
+    final ex = swappedEx ?? (globalIndex < slots.length ? slots[globalIndex].exercise : null);
+    if (ex == null) return false;
+    final log = session.getLogFor(ex.id);
     return log != null && log.sets.length >= targetSets;
   }
 
-  /// The session index that just transitioned from incomplete → complete.
-  int? _findJustCompleted(WorkoutSession prev, WorkoutSession next) {
+  /// The exercise ID that just transitioned from incomplete → complete.
+  String? _findJustCompleted(WorkoutSession prev, WorkoutSession next) {
     final split = next.splitType;
     final day = next.dayIndex;
     final slots = SeedData.getMainSlots(split, day);
-    for (final slot in slots) {
-      final globalIndex = slots.indexOf(slot);
-      final sessionIndex = _sessionIndexOf(globalIndex);
-      final nextDone = _isCompleted(globalIndex, slot.exercise.sets, next);
-      final prevDone = _isCompleted(globalIndex, slot.exercise.sets, prev);
-      if (nextDone && !prevDone) return sessionIndex;
+    for (var i = 0; i < slots.length; i++) {
+      final nextDone = _isCompleted(i, slots[i].exercise.sets, next);
+      final prevDone = _isCompleted(i, slots[i].exercise.sets, prev);
+      if (nextDone && !prevDone) {
+        final swappedEx = ref.read(activeSwapProvider)[i];
+        final ex = swappedEx ?? slots[i].exercise;
+        return ex.id;
+      }
     }
     return null;
   }
@@ -611,14 +632,14 @@ class _WorkoutScreenState extends ConsumerState<WorkoutScreen>
   void _stopRest({required bool record}) {
     _restTimer?.cancel();
     _restTimer = null;
-    if (record && _restAfterSessionIndex != null && _restElapsed > 0) {
+    if (record && _restAfterExerciseId != null && _restElapsed > 0) {
       ref.read(activeWorkoutProvider.notifier)
-          .recordExerciseRest(_restAfterSessionIndex!, _restElapsed);
+          .recordExerciseRest(_restAfterExerciseId!, _restElapsed);
     }
     setState(() {
       _resting = false;
       _restElapsed = 0;
-      _restAfterSessionIndex = null;
+      _restAfterExerciseId = null;
     });
   }
 

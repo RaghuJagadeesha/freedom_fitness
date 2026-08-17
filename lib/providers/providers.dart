@@ -334,13 +334,56 @@ class ActiveWorkoutNotifier extends StateNotifier<WorkoutSession?> {
     _persistDraft();
   }
 
-  void logSet(int exerciseIndex, SetLog setLog) {
+  /// Mark an exercise as started / opened so its per-exercise timer begins.
+  void startExercise(String exerciseId, String exerciseName) {
     if (state == null) return;
     final exercises = List<ExerciseLog>.from(state!.exercises);
-    final exercise = exercises[exerciseIndex];
-    exercises[exerciseIndex] = exercise.copyWith(
-      sets: [...exercise.sets, setLog],
-    );
+    final idx = exercises.indexWhere((e) => e.exerciseId == exerciseId);
+    final now = DateTime.now();
+
+    if (idx != -1) {
+      final ex = exercises[idx];
+      if (ex.startedAt == null) {
+        exercises[idx] = ex.copyWith(startedAt: now);
+        state = state!.copyWith(exercises: exercises);
+        _persistDraft();
+      }
+    } else {
+      exercises.add(ExerciseLog(
+        exerciseId: exerciseId,
+        exerciseName: exerciseName,
+        startedAt: now,
+      ));
+      state = state!.copyWith(exercises: exercises);
+      _persistDraft();
+    }
+  }
+
+  void logSet(String exerciseId, String exerciseName, SetLog setLog) {
+    if (state == null) return;
+    final exercises = List<ExerciseLog>.from(state!.exercises);
+    final idx = exercises.indexWhere((e) => e.exerciseId == exerciseId);
+    final now = DateTime.now();
+
+    if (idx != -1) {
+      final exercise = exercises[idx];
+      final started = exercise.startedAt ?? now;
+      final elapsed = now.difference(started).inSeconds;
+      final newElapsed = elapsed > exercise.elapsedSeconds ? elapsed : exercise.elapsedSeconds;
+      exercises[idx] = exercise.copyWith(
+        sets: [...exercise.sets, setLog],
+        startedAt: started,
+        elapsedSeconds: newElapsed,
+      );
+    } else {
+      exercises.add(ExerciseLog(
+        exerciseId: exerciseId,
+        exerciseName: exerciseName,
+        sets: [setLog],
+        startedAt: now,
+        elapsedSeconds: 0,
+      ));
+    }
     state = state!.copyWith(exercises: exercises);
     _persistDraft();
   }
@@ -349,74 +392,125 @@ class ActiveWorkoutNotifier extends StateNotifier<WorkoutSession?> {
   void togglePrimerExercise(int exerciseIndex) {
     if (state == null) return;
     final exercises = List<ExerciseLog>.from(state!.exercises);
+    if (exerciseIndex < 0 || exerciseIndex >= exercises.length) return;
     final exercise = exercises[exerciseIndex];
     final done = exercise.sets.isNotEmpty;
+    final now = DateTime.now();
     exercises[exerciseIndex] = done
         ? exercise.copyWith(sets: const [])
-        : exercise.copyWith(sets: const [
-            SetLog(setNumber: 1, weight: 0, repsCompleted: 1),
-          ]);
+        : exercise.copyWith(
+            sets: const [SetLog(setNumber: 1, weight: 0, repsCompleted: 1)],
+            startedAt: exercise.startedAt ?? now,
+            completedAt: now,
+            elapsedSeconds: exercise.startedAt != null ? now.difference(exercise.startedAt!).inSeconds : 60,
+          );
     state = state!.copyWith(exercises: exercises);
     _persistDraft();
   }
 
-  void editSet(int exerciseIndex, int setIndex, double newWeight, int newReps) {
+  void editSet(String exerciseId, int setIndex, double newWeight, int newReps) {
     if (state == null) return;
     final exercises = List<ExerciseLog>.from(state!.exercises);
-    final oldSets = List<SetLog>.from(exercises[exerciseIndex].sets);
+    final idx = exercises.indexWhere((e) => e.exerciseId == exerciseId);
+    if (idx == -1) return;
+    final oldSets = List<SetLog>.from(exercises[idx].sets);
+    if (setIndex < 0 || setIndex >= oldSets.length) return;
     oldSets[setIndex] = oldSets[setIndex].copyWith(
       weight: newWeight,
       repsCompleted: newReps,
     );
-    exercises[exerciseIndex] = exercises[exerciseIndex].copyWith(sets: oldSets);
+    exercises[idx] = exercises[idx].copyWith(sets: oldSets);
     state = state!.copyWith(exercises: exercises);
     _persistDraft();
   }
 
   /// Record the rest the user took before logging the next set — applied to
-  /// the most recently logged set of [exerciseIndex].
-  void recordSetRest(int exerciseIndex, int restSeconds) {
+  /// the most recently logged set of [exerciseId].
+  void recordSetRest(String exerciseId, int restSeconds) {
     if (state == null || restSeconds <= 0) return;
     final exercises = List<ExerciseLog>.from(state!.exercises);
-    final theExercise = exercises[exerciseIndex];
+    final idx = exercises.indexWhere((e) => e.exerciseId == exerciseId);
+    if (idx == -1) return;
+    final theExercise = exercises[idx];
     if (theExercise.sets.isEmpty) return;
     final sets = List<SetLog>.from(theExercise.sets);
     sets[sets.length - 1] = sets[sets.length - 1].copyWith(restSeconds: restSeconds);
-    exercises[exerciseIndex] = theExercise.copyWith(sets: sets);
+    exercises[idx] = theExercise.copyWith(sets: sets);
     state = state!.copyWith(exercises: exercises);
     _persistDraft();
   }
 
-  /// Record the rest the user took between finishing [exerciseIndex] and
+  /// Record the rest the user took between finishing [exerciseId] and
   /// starting the next exercise.
-  void recordExerciseRest(int exerciseIndex, int restSeconds) {
+  void recordExerciseRest(String exerciseId, int restSeconds) {
     if (state == null || restSeconds <= 0) return;
     final exercises = List<ExerciseLog>.from(state!.exercises);
-    final theExercise = exercises[exerciseIndex];
-    exercises[exerciseIndex] = theExercise.copyWith(restSeconds: restSeconds);
+    final idx = exercises.indexWhere((e) => e.exerciseId == exerciseId);
+    if (idx == -1) return;
+    final theExercise = exercises[idx];
+    exercises[idx] = theExercise.copyWith(restSeconds: restSeconds);
     state = state!.copyWith(exercises: exercises);
     _persistDraft();
   }
 
-  /// Add [elapsedSeconds] of time the user spent on [exerciseIndex] (from when
-  /// the exercise was opened until it was completed / left).
-  void addExerciseElapsed(int exerciseIndex, int elapsedSeconds) {
+  /// Update elapsedSeconds for [exerciseId] based on current wall-clock time.
+  void updateExerciseElapsed(String exerciseId) {
+    if (state == null) return;
+    final exercises = List<ExerciseLog>.from(state!.exercises);
+    final idx = exercises.indexWhere((e) => e.exerciseId == exerciseId);
+    if (idx == -1) return;
+    final theExercise = exercises[idx];
+    if (theExercise.startedAt == null) return;
+    final end = theExercise.completedAt ?? DateTime.now();
+    final elapsed = end.difference(theExercise.startedAt!).inSeconds;
+    if (elapsed > theExercise.elapsedSeconds) {
+      exercises[idx] = theExercise.copyWith(elapsedSeconds: elapsed);
+      state = state!.copyWith(exercises: exercises);
+      _persistDraft();
+    }
+  }
+
+  /// Add [elapsedSeconds] of time the user spent on [exerciseId].
+  void addExerciseElapsed(String exerciseId, int elapsedSeconds) {
     if (state == null || elapsedSeconds <= 0) return;
     final exercises = List<ExerciseLog>.from(state!.exercises);
-    final theExercise = exercises[exerciseIndex];
-    exercises[exerciseIndex] = theExercise.copyWith(
+    final idx = exercises.indexWhere((e) => e.exerciseId == exerciseId);
+    if (idx == -1) return;
+    final theExercise = exercises[idx];
+    exercises[idx] = theExercise.copyWith(
       elapsedSeconds: theExercise.elapsedSeconds + elapsedSeconds,
     );
     state = state!.copyWith(exercises: exercises);
     _persistDraft();
   }
 
-  void rateExercise(int exerciseIndex, Difficulty difficulty) {
+  void rateExercise(String exerciseId, String exerciseName, Difficulty difficulty) {
     if (state == null) return;
     final exercises = List<ExerciseLog>.from(state!.exercises);
-    exercises[exerciseIndex] = exercises[exerciseIndex].copyWith(
-      difficulty: difficulty,
-    );
+    final idx = exercises.indexWhere((e) => e.exerciseId == exerciseId);
+    final now = DateTime.now();
+
+    if (idx != -1) {
+      final ex = exercises[idx];
+      final started = ex.startedAt ?? now;
+      final elapsed = now.difference(started).inSeconds;
+      final finalElapsed = elapsed > ex.elapsedSeconds ? elapsed : ex.elapsedSeconds;
+      exercises[idx] = ex.copyWith(
+        difficulty: difficulty,
+        startedAt: started,
+        completedAt: now,
+        elapsedSeconds: finalElapsed > 0 ? finalElapsed : 1,
+      );
+    } else {
+      exercises.add(ExerciseLog(
+        exerciseId: exerciseId,
+        exerciseName: exerciseName,
+        difficulty: difficulty,
+        startedAt: now,
+        completedAt: now,
+        elapsedSeconds: 1,
+      ));
+    }
     state = state!.copyWith(exercises: exercises);
     _persistDraft();
   }

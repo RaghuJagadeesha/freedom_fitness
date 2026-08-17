@@ -24,9 +24,9 @@ class _ExerciseDetailState extends ConsumerState<ExerciseDetailScreen> {
   int _restSec = 0;
   bool _resting = false;
   DateTime? _restStart;
-  late DateTime _openedAt;
   YoutubePlayerController? _ytController;
 
+  Timer? _ticker;
   bool _isVoiceListening = false;
   String? _voiceRecognizedText;
   String? _voiceFeedbackText;
@@ -34,41 +34,54 @@ class _ExerciseDetailState extends ConsumerState<ExerciseDetailScreen> {
   @override
   void initState() {
     super.initState();
-    _openedAt = DateTime.now();
     final session = ref.read(activeWorkoutProvider);
     if (session == null) return;
-    final slots = SeedData.getMainSlots(session.splitType, session.dayIndex);
-    final exId = slots[widget.exerciseIndex].exercise.id;
-    final prog = ref.read(userProgressProvider)[exId];
-    if (prog != null && prog.currentWeight > 0) _weightCtrl.text = prog.currentWeight.toString();
+    final ex = _exerciseFor(session);
+    ref.read(activeWorkoutProvider.notifier).startExercise(ex.id, ex.name);
 
-    final ytUrl = slots[widget.exerciseIndex].exercise.youtubeUrl;
-    if (ytUrl != null && ytUrl.isNotEmpty) {
-      _ytController = YoutubePlayerController.fromVideoId(
-        videoId: ytUrl,
-        autoPlay: false,
-        params: const YoutubePlayerParams(
-          showControls: true, 
-          showFullscreenButton: true,
-          playsInline: true,
-          strictRelatedVideos: true,
-        ),
-      );
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) {
+        ref.read(activeWorkoutProvider.notifier).updateExerciseElapsed(ex.id);
+        setState(() {});
+      }
+    });
+
+    final slots = SeedData.getMainSlots(session.splitType, session.dayIndex);
+    if (widget.exerciseIndex < slots.length) {
+      final exId = slots[widget.exerciseIndex].exercise.id;
+      final prog = ref.read(userProgressProvider)[exId];
+      if (prog != null && prog.currentWeight > 0) _weightCtrl.text = prog.currentWeight.toString();
+
+      final ytUrl = slots[widget.exerciseIndex].exercise.youtubeUrl;
+      if (ytUrl != null && ytUrl.isNotEmpty) {
+        _ytController = YoutubePlayerController.fromVideoId(
+          videoId: ytUrl,
+          autoPlay: false,
+          params: const YoutubePlayerParams(
+            showControls: true, 
+            showFullscreenButton: true,
+            playsInline: true,
+            strictRelatedVideos: true,
+          ),
+        );
+      }
     }
     VoiceService.initialize();
   }
 
   @override
   void dispose() {
+    _ticker?.cancel();
     _restTimer?.cancel();
-    final logIndex = widget.exerciseIndex + SeedData.primerCount;
-    if (_resting && _restStart != null) {
-      _recordCurrentRest(logIndex);
-    }
-    // Persist how long the exercise was open (true total time).
-    final elapsed = DateTime.now().difference(_openedAt).inSeconds;
-    if (elapsed > 0) {
-      ref.read(activeWorkoutProvider.notifier).addExerciseElapsed(logIndex, elapsed);
+    final session = ref.read(activeWorkoutProvider);
+    if (session != null) {
+      final ex = _exerciseFor(session);
+      if (_resting && _restStart != null) {
+        _recordCurrentRest(ex.id);
+      }
+      Future.microtask(() {
+        ref.read(activeWorkoutProvider.notifier).updateExerciseElapsed(ex.id);
+      });
     }
     _weightCtrl.dispose();
     _repsCtrl.dispose();
@@ -85,8 +98,7 @@ class _ExerciseDetailState extends ConsumerState<ExerciseDetailScreen> {
     final swapMap = ref.watch(activeSwapProvider);
     final swappedEx = swapMap[widget.exerciseIndex];
     final ex = swappedEx ?? slots[widget.exerciseIndex].exercise;
-    final logIndex = widget.exerciseIndex + SeedData.primerCount;
-    final log = session.exercises[logIndex];
+    final log = session.getLogFor(ex.id) ?? ExerciseLog(exerciseId: ex.id, exerciseName: ex.name);
     final done = log.sets.length >= ex.sets;
     final dayColors = [AppColors.workoutA, AppColors.workoutB, AppColors.primary, AppColors.floater, AppColors.accent];
     final color = dayColors[session.dayIndex % dayColors.length];
@@ -245,7 +257,7 @@ class _ExerciseDetailState extends ConsumerState<ExerciseDetailScreen> {
           Row(children: Difficulty.values.map((d) {
             final c = {Difficulty.easy: AppColors.primary, Difficulty.moderate: AppColors.secondary, Difficulty.hard: AppColors.error};
             final l = {Difficulty.easy: '😎 Easy', Difficulty.moderate: '💪 Mod', Difficulty.hard: '🔥 Hard'};
-            return Expanded(child: GestureDetector(onTap: () => ref.read(activeWorkoutProvider.notifier).rateExercise(logIndex, d),
+            return Expanded(child: GestureDetector(onTap: () => ref.read(activeWorkoutProvider.notifier).rateExercise(ex.id, ex.name, d),
               child: Container(margin: EdgeInsets.only(right: d != Difficulty.hard ? 8 : 0), padding: const EdgeInsets.symmetric(vertical: 14),
                 decoration: BoxDecoration(color: c[d]!.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(12), border: Border.all(color: c[d]!.withValues(alpha: 0.3))),
                 child: Center(child: Text(l[d]!, style: TextStyle(color: c[d], fontWeight: FontWeight.w600, fontSize: 13))))));
@@ -330,7 +342,11 @@ class _ExerciseDetailState extends ConsumerState<ExerciseDetailScreen> {
           ElevatedButton(onPressed: () {
             final w = double.tryParse(wCtrl.text) ?? set.weight;
             final r = int.tryParse(rCtrl.text) ?? set.repsCompleted;
-            ref.read(activeWorkoutProvider.notifier).editSet(widget.exerciseIndex + SeedData.primerCount, setIndex, w, r);
+            final session = ref.read(activeWorkoutProvider);
+            if (session != null) {
+              final ex = _exerciseFor(session);
+              ref.read(activeWorkoutProvider.notifier).editSet(ex.id, setIndex, w, r);
+            }
             Navigator.pop(ctx);
           }, child: const Text('Save')),
         ],
@@ -350,27 +366,30 @@ class _ExerciseDetailState extends ConsumerState<ExerciseDetailScreen> {
   void _logSet(bool isDrop) {
     final session = ref.read(activeWorkoutProvider);
     if (session == null) return;
-    final logIndex = widget.exerciseIndex + SeedData.primerCount;
     final ex = _exerciseFor(session);
+    final currentLog = session.getLogFor(ex.id);
+    final currentSetCount = currentLog?.sets.length ?? 0;
     final w = double.tryParse(_weightCtrl.text) ?? 0;
     var r = int.tryParse(_repsCtrl.text) ?? 0;
     // Never silently fail to log: default to the exercise's targets.
     if (r <= 0) r = ex.reps > 0 ? ex.reps : 1;
     if (_weightCtrl.text.isEmpty) _weightCtrl.text = w.toString();
     // Close out rest taken before this set was logged (per-set rest).
-    _recordCurrentRest(logIndex);
-    ref.read(activeWorkoutProvider.notifier).logSet(widget.exerciseIndex + SeedData.primerCount,
-      SetLog(setNumber: session.exercises[logIndex].sets.length + 1, weight: w, repsCompleted: r, isDropSet: isDrop));
+    _recordCurrentRest(ex.id);
+    ref.read(activeWorkoutProvider.notifier).logSet(
+      ex.id, ex.name,
+      SetLog(setNumber: currentSetCount + 1, weight: w, repsCompleted: r, isDropSet: isDrop),
+    );
     final rest = ref.read(restTimerDurationProvider);
     _startRest(rest);
   }
 
-  /// Persist the elapsed rest for [logIndex]'s most recent set (rest between
+  /// Persist the elapsed rest for [exerciseId]'s most recent set (rest between
   /// sets), then reset the clock.
-  void _recordCurrentRest(int logIndex) {
+  void _recordCurrentRest(String exerciseId) {
     final elapsed = _restStartElapsed;
     if (elapsed <= 0) { _restStart = DateTime.now(); return; }
-    ref.read(activeWorkoutProvider.notifier).recordSetRest(logIndex, elapsed);
+    ref.read(activeWorkoutProvider.notifier).recordSetRest(exerciseId, elapsed);
     _restStart = DateTime.now();
   }
 
@@ -422,7 +441,11 @@ class _ExerciseDetailState extends ConsumerState<ExerciseDetailScreen> {
         _restSec--;
         if (_restSec <= 0) {
           _resting = false;
-          _recordCurrentRest(widget.exerciseIndex + SeedData.primerCount);
+          final session = ref.read(activeWorkoutProvider);
+          if (session != null) {
+            final ex = _exerciseFor(session);
+            _recordCurrentRest(ex.id);
+          }
           t.cancel();
         }
       });
@@ -431,7 +454,11 @@ class _ExerciseDetailState extends ConsumerState<ExerciseDetailScreen> {
 
   void _skipRest() {
     _restTimer?.cancel();
-    _recordCurrentRest(widget.exerciseIndex + SeedData.primerCount);
+    final session = ref.read(activeWorkoutProvider);
+    if (session != null) {
+      final ex = _exerciseFor(session);
+      _recordCurrentRest(ex.id);
+    }
     setState(() { _resting = false; _restSec = 0; });
   }
 }
